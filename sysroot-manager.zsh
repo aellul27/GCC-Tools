@@ -111,8 +111,8 @@ _sysroot_add_sysroot() {
     
     # Detect GCC version and target
     _sysroot_print_info "Detecting GCC version and target triplet..."
-    local gcc_version=$(detect_gcc_version "$sysroot_path")
-    local target_triplet=$(detect_target_triplet "$sysroot_path")
+    local gcc_version=$(_sysroot_detect_gcc_version "$sysroot_path")
+    local target_triplet=$(_sysroot_detect_target_triplet "$sysroot_path")
     
     # Create new sysroot entry
     local new_sysroot=$(jq -n \
