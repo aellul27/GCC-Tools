@@ -116,7 +116,7 @@ CFLAGS_BACKUP="${CFLAGS:-}"
 CXXFLAGS_BACKUP="${CXXFLAGS:-}"
 ASFLAGS_BACKUP="${ASFLAGS:-}"
 EOF
-        print_info "Compiler flags backed up"
+    _cflag_print_info "Compiler flags backed up"
     fi
 }
 
@@ -126,10 +126,10 @@ _cflag_restore_flags() {
         export CFLAGS="$CFLAGS_BACKUP"
         export CXXFLAGS="$CXXFLAGS_BACKUP"
         export ASFLAGS="$ASFLAGS_BACKUP"
-        print_info "Compiler flags restored"
+        _cflag_print_info "Compiler flags restored"
     else
-        print_warning "No backup found, clearing flags instead"
-        clear_flags
+        _cflag_print_warning "No backup found, clearing flags instead"
+        _cflag_clear_flags
     fi
 }
 
@@ -148,7 +148,7 @@ _cflag_clear_flags() {
     unset CFLAGS
     unset CXXFLAGS
     unset ASFLAGS
-    print_success "All compiler flags cleared"
+    _cflag_print_success "All compiler flags cleared"
 }
 
 _cflag_show_flags() {
@@ -190,8 +190,8 @@ _cflag_set_flags() {
     local enable_32bit="$3"
     local enable_fpermissive="$4"
 
-    backup_flags
-    clear_flags >/dev/null
+    _cflag_backup_flags
+    _cflag_clear_flags >/dev/null
 
     local c_flags=""
     local cpp_flags=""
@@ -224,8 +224,8 @@ _cflag_set_flags() {
 
     export ASFLAGS="$asm_flags"
 
-    print_success "Compiler flags set successfully!"
-    show_flags
+    _cflag_print_success "Compiler flags set successfully!"
+    _cflag_show_flags
 }
 
 _cflag_set_standard() {
@@ -241,30 +241,30 @@ _cflag_set_standard() {
                 c_standard="$arg"
             fi
         else
-            print_error "'$arg' is not a supported standard"
-            echo ""
-            list_standards
-            return 1
+        _cflag_print_error "'$arg' is not a supported standard"
+        echo ""
+        _cflag_list_standards
+        return 1
         fi
     done
 
     if [[ -z "$c_standard" && -z "$cpp_standard" ]]; then
-        print_error "At least one valid C or C++ standard is required"
-        list_standards
+        _cflag_print_error "At least one valid C or C++ standard is required"
+        _cflag_list_standards
         return 1
     fi
 
     local enable_fpermissive="false"
-    if ask_fpermissive; then
+    if _cflag_ask_fpermissive; then
         enable_fpermissive="true"
     fi
 
     local enable_32bit="false"
-    if ask_32bit; then
+    if _cflag_ask_32bit; then
         enable_32bit="true"
     fi
 
-    set_flags "$c_standard" "$cpp_standard" "$enable_32bit" "$enable_fpermissive"
+    _cflag_set_flags "$c_standard" "$cpp_standard" "$enable_32bit" "$enable_fpermissive"
 }
 
 cflag-manager() {

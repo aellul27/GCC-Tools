@@ -27,13 +27,13 @@ _sysroot_print_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 _sysroot_init_sysroots_config() {
     if [[ ! -f "$SYSROOTS_CONFIG" ]]; then
         echo '{"sysroots": []}' > "$SYSROOTS_CONFIG"
-        print_info "Created sysroots configuration at $SYSROOTS_CONFIG"
+    _sysroot_print_info "Created sysroots configuration at $SYSROOTS_CONFIG"
     fi
 }
 
 _sysroot_check_jq() {
     if ! command -v jq &> /dev/null; then
-        print_error "jq is required but not installed. Please install jq first."
+    _sysroot_print_error "jq is required but not installed. Please install jq first."
         echo "  On Ubuntu/Debian: sudo apt-get install jq"
         echo "  On CentOS/RHEL: sudo yum install jq"
         echo "  On macOS: brew install jq"
@@ -86,12 +86,12 @@ _sysroot_add_sysroot() {
     local sysroot_name="$2"
     
     if [[ -z "$sysroot_path" ]]; then
-        print_error "Sysroot path is required"
+    _sysroot_print_error "Sysroot path is required"
         return 1
     fi
     
     if [[ ! -d "$sysroot_path" ]]; then
-        print_error "Sysroot directory does not exist: $sysroot_path"
+    _sysroot_print_error "Sysroot directory does not exist: $sysroot_path"
         return 1
     fi
     
@@ -105,12 +105,12 @@ _sysroot_add_sysroot() {
     
     # Check if sysroot already exists
     if jq -e --arg path "$sysroot_path" '.sysroots[] | select(.path == $path)' "$SYSROOTS_CONFIG" > /dev/null 2>&1; then
-        print_warning "Sysroot with path $sysroot_path already exists"
+    _sysroot_print_warning "Sysroot with path $sysroot_path already exists"
         return 1
     fi
     
     # Detect GCC version and target
-    print_info "Detecting GCC version and target triplet..."
+    _sysroot_print_info "Detecting GCC version and target triplet..."
     local gcc_version=$(detect_gcc_version "$sysroot_path")
     local target_triplet=$(detect_target_triplet "$sysroot_path")
     
@@ -134,22 +134,22 @@ _sysroot_add_sysroot() {
     jq --argjson sysroot "$new_sysroot" '.sysroots += [$sysroot]' "$SYSROOTS_CONFIG" > "$temp_config"
     mv "$temp_config" "$SYSROOTS_CONFIG"
     
-    print_success "Added sysroot '$sysroot_name'"
-    print_info "  Path: $sysroot_path"
-    print_info "  GCC Version: $gcc_version"
-    print_info "  Target: $target_triplet"
+    _sysroot_print_success "Added sysroot '$sysroot_name'"
+    _sysroot_print_info "  Path: $sysroot_path"
+    _sysroot_print_info "  GCC Version: $gcc_version"
+    _sysroot_print_info "  Target: $target_triplet"
 }
 
 _sysroot_list_sysroots() {
     if [[ ! -f "$SYSROOTS_CONFIG" ]]; then
-        print_info "No sysroots configured"
+    _sysroot_print_info "No sysroots configured"
         return 0
     fi
     
     local count=$(jq '.sysroots | length' "$SYSROOTS_CONFIG")
     
     if [[ "$count" -eq 0 ]]; then
-        print_info "No sysroots configured"
+    _sysroot_print_info "No sysroots configured"
         return 0
     fi
     
@@ -169,13 +169,13 @@ _sysroot_remove_sysroot() {
     local sysroot_name="$1"
     
     if [[ -z "$sysroot_name" ]]; then
-        print_error "Sysroot name is required"
+    _sysroot_print_error "Sysroot name is required"
         return 1
     fi
     
     # Check if sysroot exists
     if ! jq -e --arg name "$sysroot_name" '.sysroots[] | select(.name == $name)' "$SYSROOTS_CONFIG" > /dev/null 2>&1; then
-        print_error "Sysroot '$sysroot_name' not found"
+    _sysroot_print_error "Sysroot '$sysroot_name' not found"
         return 1
     fi
     
@@ -184,7 +184,7 @@ _sysroot_remove_sysroot() {
     jq --arg name "$sysroot_name" '.sysroots = (.sysroots | map(select(.name != $name)))' "$SYSROOTS_CONFIG" > "$temp_config"
     mv "$temp_config" "$SYSROOTS_CONFIG"
     
-    print_success "Removed sysroot '$sysroot_name'"
+    _sysroot_print_success "Removed sysroot '$sysroot_name'"
 }
 
 _sysroot_show_help() {
@@ -297,10 +297,10 @@ Target: \(.target_triplet)"' "$SYSROOTS_CONFIG" 2>/dev/null)
             echo -e "${CYAN}Currently Active Sysroot:${NC}"
             echo "$sysroot_info"
         else
-            print_warning "Current sysroot '$current_name' not found in configuration"
+            _sysroot_print_warning "Current sysroot '$current_name' not found in configuration"
         fi
     else
-        print_info "No sysroot currently active"
+    _sysroot_print_info "No sysroot currently active"
     fi
 }
 
@@ -308,7 +308,7 @@ Target: \(.target_triplet)"' "$SYSROOTS_CONFIG" 2>/dev/null)
 backup_path() {
     if [[ ! -f "$PATH_BACKUP_FILE" ]]; then
         echo "$PATH" > "$PATH_BACKUP_FILE"
-        print_info "PATH backed up"
+    _sysroot_print_info "PATH backed up"
     fi
 }
 
@@ -316,9 +316,9 @@ backup_path() {
 restore_path() {
     if [[ -f "$PATH_BACKUP_FILE" ]]; then
         export PATH=$(cat "$PATH_BACKUP_FILE")
-        print_info "PATH restored"
+        _sysroot_print_info "PATH restored"
     else
-        print_warning "No PATH backup found"
+        _sysroot_print_warning "No PATH backup found"
     fi
 }
 
@@ -328,7 +328,7 @@ set_sysroot_environment() {
     local sysroot_info=$(jq -r --arg name "$sysroot_name" '.sysroots[] | select(.name == $name)' "$SYSROOTS_CONFIG" 2>/dev/null)
     
     if [[ -z "$sysroot_info" ]]; then
-        print_error "Sysroot '$sysroot_name' not found"
+    _sysroot_print_error "Sysroot '$sysroot_name' not found"
         return 1
     fi
     
@@ -355,7 +355,7 @@ set_sysroot_environment() {
     done
     
     if [[ -z "$gcc_path" ]]; then
-        print_error "No GCC found in sysroot"
+    _sysroot_print_error "No GCC found in sysroot"
         return 1
     fi
     
@@ -396,10 +396,10 @@ set_sysroot_environment() {
     # Save current sysroot
     echo "$sysroot_name" > "$CURRENT_SYSROOT_FILE"
     
-    print_success "Environment set for sysroot '$sysroot_name'"
-    print_info "  GCC: $gcc_path"
-    print_info "  Sysroot: $sysroot_path"
-    print_info "  Target: $target_triplet"
+    _sysroot_print_success "Environment set for sysroot '$sysroot_name'"
+    _sysroot_print_info "  GCC: $gcc_path"
+    _sysroot_print_info "  Sysroot: $sysroot_path"
+    _sysroot_print_info "  Target: $target_triplet"
 }
 
 # Function to reset environment
@@ -416,7 +416,7 @@ reset_environment() {
     # Remove current sysroot file
     [[ -f "$CURRENT_SYSROOT_FILE" ]] && rm "$CURRENT_SYSROOT_FILE"
     
-    print_success "Environment reset to original state"
+    _sysroot_print_success "Environment reset to original state"
 }
 
 # Function to select sysroot interactively or by name
@@ -433,7 +433,7 @@ select_sysroot() {
     local count=$(jq '.sysroots | length' "$SYSROOTS_CONFIG" 2>/dev/null || echo "0")
     
     if [[ "$count" -eq 0 ]]; then
-        print_info "No sysroots configured. Use 'sysroot-manager add' to add one."
+    _sysroot_print_info "No sysroots configured. Use 'sysroot-manager add' to add one."
         return 0
     fi
     
@@ -462,7 +462,7 @@ select_sysroot() {
     read selection
     
     if [[ "$selection" == "q" || "$selection" == "Q" ]]; then
-        print_info "Selection cancelled"
+    _sysroot_print_info "Selection cancelled"
         return 0
     fi
     
@@ -470,7 +470,7 @@ select_sysroot() {
         local selected_name="${names[$((selection-1))]}"
         set_sysroot_environment "$selected_name"
     else
-        print_error "Invalid selection: $selection"
+    _sysroot_print_error "Invalid selection: $selection"
         return 1
     fi
 }
@@ -480,14 +480,14 @@ generate_env_script() {
     local sysroot_name="$1"
     
     if [[ -z "$sysroot_name" ]]; then
-        print_error "Sysroot name is required"
+    _sysroot_print_error "Sysroot name is required"
         return 1
     fi
     
     local sysroot_info=$(jq -r --arg name "$sysroot_name" '.sysroots[] | select(.name == $name)' "$SYSROOTS_CONFIG" 2>/dev/null)
     
     if [[ -z "$sysroot_info" ]]; then
-        print_error "Sysroot '$sysroot_name' not found"
+    _sysroot_print_error "Sysroot '$sysroot_name' not found"
         return 1
     fi
     
@@ -509,7 +509,7 @@ generate_env_script() {
     done
     
     if [[ -z "$gcc_path" ]]; then
-        print_error "No GCC found in sysroot" >&2
+    _sysroot_print_error "No GCC found in sysroot" >&2
         return 1
     fi
     
