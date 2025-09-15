@@ -218,8 +218,7 @@ _sysroot_show_help() {
         echo -e "  sysroot-manager select arm-linux"
         echo
         echo -e "  # Generate environment script"
-        echo -e "  sysroot-manager env arm-linux > /tmp/arm-env.sh"
-        echo -e "  source /tmp/arm-env.sh"
+        echo -e "  sysroot-manager env arm-linux"
         echo
         echo -e "  # Reset environment"
         echo -e "  sysroot-manager reset"
@@ -270,7 +269,7 @@ sysroot-manager() {
                 eval "val=\"\${$var}\""
                 [[ -n "$val" ]] && echo "export $var='$val'" >> "$envfile"
             done
-            _sysroot_print_success "Environment file written to $envfile"
+            _sysroot_print_success "Environment file written to $envfile"   
             ;;
         "help"|"--help"|"-h"|"")
             _sysroot_show_help

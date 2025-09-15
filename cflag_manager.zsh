@@ -36,6 +36,7 @@ _cflag_show_help() {
     echo "  ${GREEN}clear${NC}                    Clear all compiler flags"
     echo "  ${GREEN}reset${NC}                    Reset flags to original state"
     echo "  ${GREEN}list${NC}                     List all supported standards"
+    echo "  ${GREEN}env${NC} [file]               Export flags to sourcable environment file"
     echo "  ${GREEN}help${NC}                     Show this help message"
     echo ""
     echo "${YELLOW}FEATURES:${NC}"
