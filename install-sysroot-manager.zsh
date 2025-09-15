@@ -155,9 +155,6 @@ if [[ -f "$CFLAG_MANAGER_SCRIPT" ]]; then
     # Add to PATH if not already there
     if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
         echo "Adding $INSTALL_DIR to PATH in ~/.zshrc"
-        echo "" >> ~/.zshrc
-        echo "# Added by cflag-manager installer" >> ~/.zshrc
-        echo "export PATH=\"$INSTALL_DIR:\$PATH\"" >> ~/.zshrc
         echo "source \"$INSTALL_DIR/cflag_manager.zsh\"" >> ~/.zshrc
         echo ""
         echo "✓ Added to ~/.zshrc. Please run 'source ~/.zshrc' or restart your shell."
@@ -165,27 +162,6 @@ if [[ -f "$CFLAG_MANAGER_SCRIPT" ]]; then
         echo "✓ $INSTALL_DIR already in PATH"
     fi
 
-    echo ""
-    echo "=== CFlag Manager Usage Examples ==="
-    echo ""
-    echo "1. Showing help:"
-    cflag-manager help
-    echo ""
-    echo "2. Setting C and C++ standards (with prompts):"
-    cflag-manager set c11 c++17
-    echo ""
-    echo "3. Showing current flags:"
-    cflag-manager show
-    echo ""
-    echo "4. Listing supported standards:"
-    cflag-manager list
-    echo ""
-    echo "5. Clearing flags:"
-    cflag-manager clear
-    echo ""
-    echo "6. Restoring original flags:"
-    cflag-manager reset
-    echo ""
 else
     echo "WARNING: cflag_manager.zsh not found in $SCRIPT_DIR. Skipping CFlag Manager installation."
 fi
