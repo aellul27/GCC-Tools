@@ -1,9 +1,10 @@
 #!/usr/bin/env zsh
 
 # Sysroot Manager - Installation and Test Script
-# This script demonstrates how to install and use the sysroot manager
+# This script installs and wires sysroot-manager into ~/.zshrc and demonstrates basic usage.
 
-SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+# Resolve this script directory in zsh (absolute path)
+SCRIPT_DIR="${0:A:h}"
 INSTALL_DIR="$HOME/.local/bin"
 SYSROOT_MANAGER_SCRIPT="$SCRIPT_DIR/sysroot-manager.zsh"
 
@@ -25,17 +26,43 @@ chmod +x "$INSTALL_DIR/sysroot-manager.zsh"
 
 echo "✓ Installed sysroot-manager.zsh to $INSTALL_DIR"
 
-# Add to PATH if not already there
+# Helper to append a line to ~/.zshrc only if it doesn't already exist
+ensure_line_in_zshrc() {
+    local line="$1"
+    if ! grep -qxF -- "$line" "$HOME/.zshrc" 2>/dev/null; then
+        echo "$line" >> "$HOME/.zshrc"
+        return 0
+    fi
+    return 1
+}
+
+# Add to PATH if not already there, and ensure sourcing is present
+added_any=0
 if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
     echo "Adding $INSTALL_DIR to PATH in ~/.zshrc"
-    echo "" >> ~/.zshrc
-    echo "# Added by sysroot-manager installer" >> ~/.zshrc
-    echo "export PATH=\"$INSTALL_DIR:\$PATH\"" >> ~/.zshrc
-    echo "source \"$INSTALL_DIR/sysroot-manager.zsh\"" >> ~/.zshrc
-    echo ""
-    echo "✓ Added to ~/.zshrc. Please run 'source ~/.zshrc' or restart your shell."
+    ensure_line_in_zshrc "" && added_any=1
+    ensure_line_in_zshrc "# Added by sysroot-manager installer" && added_any=1
+    ensure_line_in_zshrc "export PATH=\"$INSTALL_DIR:\$PATH\"" && added_any=1
+    echo "✓ Added PATH export to ~/.zshrc"
 else
-    echo "✓ $INSTALL_DIR already in PATH"
+    # Even if PATH already includes INSTALL_DIR, ensure we export it on login shells
+    if ensure_line_in_zshrc "export PATH=\"$INSTALL_DIR:\$PATH\""; then
+        echo "✓ Ensured PATH export is present in ~/.zshrc"
+        added_any=1
+    else
+        echo "✓ $INSTALL_DIR already in PATH"
+    fi
+fi
+
+# Ensure sysroot-manager.zsh is sourced on shell startup
+if ensure_line_in_zshrc "source \"$INSTALL_DIR/sysroot-manager.zsh\""; then
+    echo "✓ Ensured sysroot-manager is sourced in ~/.zshrc"
+    added_any=1
+fi
+
+if [[ $added_any -eq 1 ]]; then
+    echo ""
+    echo "✓ Updated ~/.zshrc. Please run 'source ~/.zshrc' or restart your shell."
 fi
 
 echo ""
@@ -74,8 +101,8 @@ echo "   (This would add a cross-compilation sysroot if it existed)"
 echo ""
 
 # Show how to generate an environment script
-echo "4. Example of generating environment script:"
-echo "   sysroot-manager env arm-linux > /tmp/arm-env.sh"
+echo "4. Example of writing current environment to a file:"
+echo "   sysroot-manager env /tmp/arm-env.sh"
 echo "   source /tmp/arm-env.sh"
 echo ""
 
@@ -109,7 +136,7 @@ echo "   \$CC --version"
 echo "   echo \$PKG_CONFIG_SYSROOT_DIR"
 echo ""
 echo "5. Create a temporary environment script:"
-echo "   sysroot-manager env arm-linux > /tmp/my-cross-env.sh"
+echo "   sysroot-manager env /tmp/my-cross-env.sh"
 echo "   # Later in a new shell:"
 echo "   source /tmp/my-cross-env.sh"
 echo ""
@@ -152,14 +179,10 @@ if [[ -f "$CFLAG_MANAGER_SCRIPT" ]]; then
     chmod +x "$INSTALL_DIR/cflag_manager.zsh"
     echo "✓ Installed cflag_manager.zsh to $INSTALL_DIR"
 
-    # Add to PATH if not already there
-    if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
-        echo "Adding $INSTALL_DIR to PATH in ~/.zshrc"
-        echo "source \"$INSTALL_DIR/cflag_manager.zsh\"" >> ~/.zshrc
-        echo ""
-        echo "✓ Added to ~/.zshrc. Please run 'source ~/.zshrc' or restart your shell."
-    else
-        echo "✓ $INSTALL_DIR already in PATH"
+    # Ensure cflag_manager.zsh is sourced on shell startup
+    if ensure_line_in_zshrc "source \"$INSTALL_DIR/cflag_manager.zsh\""; then
+        echo "✓ Ensured cflag_manager is sourced in ~/.zshrc"
+        echo "Please run 'source ~/.zshrc' or restart your shell."
     fi
 
 else
