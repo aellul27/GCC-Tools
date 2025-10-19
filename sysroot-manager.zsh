@@ -1,13 +1,12 @@
 #!/usr/bin/env zsh
 
 # Sysroot Manager - A zsh script for managing GCC versions with sysroots
-# Author: GitHub Copilot
-# Version: 1.0.0
 
 SYSROOTS_CONFIG="$HOME/.sysroots.json"
 TEMP_ENV_DIR="/tmp"
 CURRENT_SYSROOT_FILE="$HOME/.current_sysroot"
 PATH_BACKUP_FILE="$HOME/.path_backup"
+DEFAULT_SYSROOT_IN_ENV_MODE="ask" # on|off|ask
 
 # Color codes for output
 RED='\033[0;31m'
@@ -24,16 +23,46 @@ _sysroot_print_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 _sysroot_print_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 _sysroot_print_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
+# Resolve whether to include --sysroot flags and export SYSROOT based on mode.
+# Args:
+#   $1 - mode (on|off|ask)
+# Returns 0 (true) to include, 1 (false) to skip
+_sysroot_should_include_sysroot() {
+    local mode="${1:-$DEFAULT_SYSROOT_IN_ENV_MODE}"
+    case "${(L)mode}" in
+        on)
+            return 0
+            ;;
+        off)
+            return 1
+            ;;
+        ask|*)
+            # If not an interactive TTY, default to previous behavior: include
+            if [[ ! -t 0 ]]; then
+                _sysroot_print_info "Non-interactive shell detected; defaulting to including --sysroot and SYSROOT (use --sysroot-in-env=off to disable)."
+                return 0
+            fi
+            local reply
+            read -r "reply?Add --sysroot flags and export SYSROOT variable? [Y/n]: "
+            reply="${(L)reply}"
+            if [[ -z "$reply" || "$reply" == "y" || "$reply" == "yes" ]]; then
+                return 0
+            fi
+            return 1
+            ;;
+    esac
+}
+
 _sysroot_init_sysroots_config() {
     if [[ ! -f "$SYSROOTS_CONFIG" ]]; then
         echo '{"sysroots": []}' > "$SYSROOTS_CONFIG"
-    _sysroot_print_info "Created sysroots configuration at $SYSROOTS_CONFIG"
+        _sysroot_print_info "Created sysroots configuration at $SYSROOTS_CONFIG"
     fi
 }
 
 _sysroot_check_jq() {
     if ! command -v jq &> /dev/null; then
-    _sysroot_print_error "jq is required but not installed. Please install jq first."
+        _sysroot_print_error "jq is required but not installed. Please install jq first."
         echo "  On Ubuntu/Debian: sudo apt-get install jq"
         echo "  On CentOS/RHEL: sudo yum install jq"
         echo "  On macOS: brew install jq"
@@ -86,12 +115,12 @@ _sysroot_add_sysroot() {
     local sysroot_name="$2"
     
     if [[ -z "$sysroot_path" ]]; then
-    _sysroot_print_error "Sysroot path is required"
+        _sysroot_print_error "Sysroot path is required"
         return 1
     fi
     
     if [[ ! -d "$sysroot_path" ]]; then
-    _sysroot_print_error "Sysroot directory does not exist: $sysroot_path"
+        _sysroot_print_error "Sysroot directory does not exist: $sysroot_path"
         return 1
     fi
     
@@ -105,7 +134,7 @@ _sysroot_add_sysroot() {
     
     # Check if sysroot already exists
     if jq -e --arg path "$sysroot_path" '.sysroots[] | select(.path == $path)' "$SYSROOTS_CONFIG" > /dev/null 2>&1; then
-    _sysroot_print_warning "Sysroot with path $sysroot_path already exists"
+        _sysroot_print_warning "Sysroot with path $sysroot_path already exists"
         return 1
     fi
     
@@ -142,14 +171,14 @@ _sysroot_add_sysroot() {
 
 _sysroot_list_sysroots() {
     if [[ ! -f "$SYSROOTS_CONFIG" ]]; then
-    _sysroot_print_info "No sysroots configured"
+        _sysroot_print_info "No sysroots configured"
         return 0
     fi
     
     local count=$(jq '.sysroots | length' "$SYSROOTS_CONFIG")
     
     if [[ "$count" -eq 0 ]]; then
-    _sysroot_print_info "No sysroots configured"
+        _sysroot_print_info "No sysroots configured"
         return 0
     fi
     
@@ -169,13 +198,13 @@ _sysroot_remove_sysroot() {
     local sysroot_name="$1"
     
     if [[ -z "$sysroot_name" ]]; then
-    _sysroot_print_error "Sysroot name is required"
+        _sysroot_print_error "Sysroot name is required"
         return 1
     fi
     
     # Check if sysroot exists
     if ! jq -e --arg name "$sysroot_name" '.sysroots[] | select(.name == $name)' "$SYSROOTS_CONFIG" > /dev/null 2>&1; then
-    _sysroot_print_error "Sysroot '$sysroot_name' not found"
+        _sysroot_print_error "Sysroot '$sysroot_name' not found"
         return 1
     fi
     
@@ -188,45 +217,49 @@ _sysroot_remove_sysroot() {
 }
 
 _sysroot_show_help() {
-        echo -e "${CYAN}Sysroot Manager${NC} - GCC Version Management with Sysroots"
-        echo
-        echo -e "${YELLOW}USAGE:${NC}"
-        echo -e "  source sysroot-manager.zsh"
-        echo -e "  sysroot-manager [COMMAND] [OPTIONS]"
-        echo
-        echo -e "${YELLOW}COMMANDS:${NC}"
-        echo -e "  ${GREEN}add${NC} <path> [name]        Add a new sysroot"
-        echo -e "  ${GREEN}list${NC}                     List all configured sysroots"
-        echo -e "  ${GREEN}select${NC} [name]            Select and activate a sysroot"
-        echo -e "  ${GREEN}remove${NC} <name>            Remove a sysroot"
-        echo -e "  ${GREEN}current${NC}                  Show currently active sysroot"
-        echo -e "  ${GREEN}reset${NC}                    Reset environment to original state"
-        echo -e "  ${GREEN}env${NC} <name>               Generate temporary environment script"
-        echo -e "  ${GREEN}help${NC}                     Show this help message"
-        echo
-        echo -e "${YELLOW}EXAMPLES:${NC}"
-        echo -e "  # Add a sysroot"
-        echo -e "  sysroot-manager add /opt/gcc-arm-linux-gnueabihf arm-linux"
-        echo
-        echo -e "  # List all sysroots"
-        echo -e "  sysroot-manager list"
-        echo
-        echo -e "  # Select a sysroot interactively"
-        echo -e "  sysroot-manager select"
-        echo
-        echo -e "  # Select a specific sysroot"
-        echo -e "  sysroot-manager select arm-linux"
-        echo
-        echo -e "  # Generate environment script"
-        echo -e "  sysroot-manager env arm-linux"
-        echo
-        echo -e "  # Reset environment"
-        echo -e "  sysroot-manager reset"
-        echo
-        echo -e "${YELLOW}FILES:${NC}"
-        echo -e "  ~/.sysroots.json         Sysroot configuration"
-        echo -e "  ~/.current_sysroot       Currently active sysroot"
-        echo -e "  ~/.path_backup           Original PATH backup"
+    echo -e "${CYAN}Sysroot Manager${NC} - GCC Version Management with Sysroots"
+    echo
+    echo -e "${YELLOW}USAGE:${NC}"
+    echo -e "  source sysroot-manager.zsh"
+    echo -e "  sysroot-manager [COMMAND] [OPTIONS]"
+    echo
+    echo -e "${YELLOW}COMMANDS:${NC}"
+    echo -e "  ${GREEN}add${NC} <path> [name]        Add a new sysroot"
+    echo -e "  ${GREEN}list${NC}                     List all configured sysroots"
+    echo -e "  ${GREEN}select${NC} [name] [--sysroot-in-env=on|off|ask]  Select and activate a sysroot"
+    echo -e "  ${GREEN}remove${NC} <name>            Remove a sysroot"
+    echo -e "  ${GREEN}current${NC}                  Show currently active sysroot"
+    echo -e "  ${GREEN}reset${NC}                    Reset environment to original state"
+    echo -e "  ${GREEN}env${NC} [file]               Write current env to a file (default: sysroot_manager.env)"
+    echo -e "  ${GREEN}help${NC}                     Show this help message"
+    echo
+    echo -e "${YELLOW}OPTIONS:${NC}"
+    echo -e "  --sysroot-in-env=on|off|ask   Control whether to export SYSROOT and add --sysroot to CFLAGS/CXXFLAGS/LDFLAGS."
+    echo -e "                                 Default: ask (prompts in interactive shells; implies 'on' in non-interactive)."
+    echo
+    echo -e "${YELLOW}EXAMPLES:${NC}"
+    echo -e "  # Add a sysroot"
+    echo -e "  sysroot-manager add /opt/gcc-arm-linux-gnueabihf arm-linux"
+    echo
+    echo -e "  # List all sysroots"
+    echo -e "  sysroot-manager list"
+    echo
+    echo -e "  # Select a sysroot interactively"
+    echo -e "  sysroot-manager select --sysroot-in-env=ask"
+    echo
+    echo -e "  # Select a specific sysroot"
+    echo -e "  sysroot-manager select arm-linux --sysroot-in-env=on"
+    echo
+    echo -e "  # Write current environment to a file"
+    echo -e "  sysroot-manager env ./toolchain.env"
+    echo
+    echo -e "  # Reset environment"
+    echo -e "  sysroot-manager reset"
+    echo
+    echo -e "${YELLOW}FILES:${NC}"
+    echo -e "  ~/.sysroots.json         Sysroot configuration"
+    echo -e "  ~/.current_sysroot       Currently active sysroot"
+    echo -e "  ~/.path_backup           Original PATH backup"
 }
 
 sysroot-manager() {
@@ -251,7 +284,23 @@ sysroot-manager() {
             _sysroot_list_sysroots
             ;;
         "select")
-            select_sysroot "$1"
+            # Parse arguments: optional name and --sysroot-in-env mode
+            local selected_name=""
+            local sysroot_in_env_mode="$DEFAULT_SYSROOT_IN_ENV_MODE"
+            for arg in "$@"; do
+                if [[ "$arg" == --sysroot-in-env=* ]]; then
+                    local val="${arg#*=}"
+                    val="${(L)val}"
+                    if [[ "$val" == "on" || "$val" == "off" || "$val" == "ask" ]]; then
+                        sysroot_in_env_mode="$val"
+                    else
+                        _sysroot_print_warning "Ignoring invalid value for --sysroot-in-env: $val"
+                    fi
+                elif [[ -z "$selected_name" && "$arg" != --* ]]; then
+                    selected_name="$arg"
+                fi
+            done
+            select_sysroot "$selected_name" "$sysroot_in_env_mode"
             ;;
         "remove")
             _sysroot_remove_sysroot "$1"
@@ -265,16 +314,17 @@ sysroot-manager() {
         "env")
             local envfile="${1:-sysroot_manager.env}"
             echo "# Sourcable environment file generated by sysroot-manager" > "$envfile"
-            # Add export for PATH with GCC bin directory
+            # Add export for PATH with GCC bin directory (based on current CC)
             if [[ -n "$CC" ]]; then
                 gcc_bin_dir="$(dirname "$CC")"
                 echo "export PATH='$gcc_bin_dir':\$PATH" >> "$envfile"
             fi
+            # Persist only variables that are currently set in the shell
             for var in CC CXX AS AR LD NM STRIP OBJCOPY OBJDUMP RANLIB SIZE STRINGS READELF SYSROOT CROSS_COMPILE PKG_CONFIG_SYSROOT_DIR PKG_CONFIG_PATH PKG_CONFIG_LIBDIR CFLAGS CXXFLAGS LDFLAGS; do
                 eval "val=\"\${$var}\""
                 [[ -n "$val" ]] && echo "export $var='$val'" >> "$envfile"
             done
-            _sysroot_print_success "Environment file written to $envfile"   
+            _sysroot_print_success "Environment file written to $envfile"
             ;;
         "help"|"--help"|"-h"|"")
             _sysroot_show_help
@@ -304,7 +354,7 @@ Target: \(.target_triplet)"' "$SYSROOTS_CONFIG" 2>/dev/null)
             _sysroot_print_warning "Current sysroot '$current_name' not found in configuration"
         fi
     else
-    _sysroot_print_info "No sysroot currently active"
+        _sysroot_print_info "No sysroot currently active"
     fi
 }
 
@@ -312,7 +362,7 @@ Target: \(.target_triplet)"' "$SYSROOTS_CONFIG" 2>/dev/null)
 backup_path() {
     if [[ ! -f "$PATH_BACKUP_FILE" ]]; then
         echo "$PATH" > "$PATH_BACKUP_FILE"
-    _sysroot_print_info "PATH backed up"
+        _sysroot_print_info "PATH backed up"
     fi
 }
 
@@ -329,10 +379,11 @@ restore_path() {
 # Function to set environment variables for a sysroot
 set_sysroot_environment() {
     local sysroot_name="$1"
+    local sysroot_in_env_mode="${2:-$DEFAULT_SYSROOT_IN_ENV_MODE}"
     local sysroot_info=$(jq -r --arg name "$sysroot_name" '.sysroots[] | select(.name == $name)' "$SYSROOTS_CONFIG" 2>/dev/null)
     
     if [[ -z "$sysroot_info" ]]; then
-    _sysroot_print_error "Sysroot '$sysroot_name' not found"
+        _sysroot_print_error "Sysroot '$sysroot_name' not found"
         return 1
     fi
     
@@ -359,7 +410,7 @@ set_sysroot_environment() {
     done
     
     if [[ -z "$gcc_path" ]]; then
-    _sysroot_print_error "No GCC found in sysroot"
+        _sysroot_print_error "No GCC found in sysroot"
         return 1
     fi
     
@@ -383,27 +434,34 @@ set_sysroot_environment() {
     export STRINGS="${bin_dir}/${tool_prefix}strings"
     export READELF="${bin_dir}/${tool_prefix}readelf"
     
-    # Set sysroot-related variables
-    export SYSROOT="$sysroot_path"
+    # Always set CROSS_COMPILE
     export CROSS_COMPILE="$tool_prefix"
-    
-    # Set pkg-config environment variables
-    export PKG_CONFIG_SYSROOT_DIR="$sysroot_path"
+    # Always set pkg-config path variables (except SYSROOT_DIR)
     export PKG_CONFIG_PATH="$sysroot_path/usr/lib/pkgconfig:$sysroot_path/usr/share/pkgconfig:$sysroot_path/lib/pkgconfig"
     export PKG_CONFIG_LIBDIR="$sysroot_path/usr/lib/pkgconfig:$sysroot_path/usr/share/pkgconfig"
-    
-    # Additional cross-compilation flags
-    export CFLAGS="--sysroot=$sysroot_path"
-    export CXXFLAGS="--sysroot=$sysroot_path"
-    export LDFLAGS="--sysroot=$sysroot_path"
+
+    # Determine whether to include --sysroot flags and export SYSROOT
+    if _sysroot_should_include_sysroot "$sysroot_in_env_mode"; then
+        export SYSROOT="$sysroot_path"
+        export PKG_CONFIG_SYSROOT_DIR="$sysroot_path"
+        export CFLAGS="--sysroot=$sysroot_path"
+        export CXXFLAGS="--sysroot=$sysroot_path"
+        export LDFLAGS="--sysroot=$sysroot_path"
+    else
+        unset SYSROOT PKG_CONFIG_SYSROOT_DIR CFLAGS CXXFLAGS LDFLAGS
+    fi
     
     # Save current sysroot
     echo "$sysroot_name" > "$CURRENT_SYSROOT_FILE"
     
     _sysroot_print_success "Environment set for sysroot '$sysroot_name'"
     _sysroot_print_info "  GCC: $gcc_path"
-    _sysroot_print_info "  Sysroot: $sysroot_path"
     _sysroot_print_info "  Target: $target_triplet"
+    if [[ -n "$SYSROOT" ]]; then
+        _sysroot_print_info "  Sysroot: $sysroot_path (exported; --sysroot applied)"
+    else
+        _sysroot_print_info "  Sysroot flags: not applied (use --sysroot-in-env=on to force)"
+    fi
 }
 
 # Function to reset environment
@@ -426,10 +484,11 @@ reset_environment() {
 # Function to select sysroot interactively or by name
 select_sysroot() {
     local sysroot_name="$1"
+    local sysroot_in_env_mode="${2:-$DEFAULT_SYSROOT_IN_ENV_MODE}"
     
     # If name provided, use it directly
     if [[ -n "$sysroot_name" ]]; then
-        set_sysroot_environment "$sysroot_name"
+        set_sysroot_environment "$sysroot_name" "$sysroot_in_env_mode"
         return $?
     fi
     
@@ -437,7 +496,7 @@ select_sysroot() {
     local count=$(jq '.sysroots | length' "$SYSROOTS_CONFIG" 2>/dev/null || echo "0")
     
     if [[ "$count" -eq 0 ]]; then
-    _sysroot_print_info "No sysroots configured. Use 'sysroot-manager add' to add one."
+        _sysroot_print_info "No sysroots configured. Use 'sysroot-manager add' to add one."
         return 0
     fi
     
@@ -466,15 +525,15 @@ select_sysroot() {
     read selection
     
     if [[ "$selection" == "q" || "$selection" == "Q" ]]; then
-    _sysroot_print_info "Selection cancelled"
+        _sysroot_print_info "Selection cancelled"
         return 0
     fi
     
     if [[ "$selection" =~ ^[0-9]+$ ]] && [[ "$selection" -ge 1 ]] && [[ "$selection" -le "$count" ]]; then
         local selected_name="${names[$((selection-1))]}"
-        set_sysroot_environment "$selected_name"
+        set_sysroot_environment "$selected_name" "$sysroot_in_env_mode"
     else
-    _sysroot_print_error "Invalid selection: $selection"
+        _sysroot_print_error "Invalid selection: $selection"
         return 1
     fi
 }
@@ -482,6 +541,7 @@ select_sysroot() {
 # Function to generate temporary environment script
 generate_env_script() {
     local sysroot_name="$1"
+    local sysroot_in_env_mode="${2:-$DEFAULT_SYSROOT_IN_ENV_MODE}"
     
     if [[ -z "$sysroot_name" ]]; then
     _sysroot_print_error "Sysroot name is required"
@@ -518,7 +578,29 @@ generate_env_script() {
     fi
     
     local bin_dir=$(dirname "$gcc_path")
-    
+
+    # Decide whether to include SYSROOT and flags in the generated script
+    local include_sysroot_block=0
+    if _sysroot_should_include_sysroot "$sysroot_in_env_mode"; then
+        include_sysroot_block=1
+    fi
+
+    # Prepare optional sysroot block text
+    local sysroot_block=""
+    if [[ $include_sysroot_block -eq 1 ]]; then
+        sysroot_block=$(cat << EOI
+# Sysroot variables
+export SYSROOT="$sysroot_path"
+export PKG_CONFIG_SYSROOT_DIR="$sysroot_path"
+
+# Compilation flags
+export CFLAGS="--sysroot=$sysroot_path"
+export CXXFLAGS="--sysroot=$sysroot_path"
+export LDFLAGS="--sysroot=$sysroot_path"
+EOI
+)
+    fi
+
     # Generate the environment script
     cat << EOF
 #!/usr/bin/env zsh
@@ -547,20 +629,10 @@ export RANLIB="${bin_dir}/${tool_prefix}ranlib"
 export SIZE="${bin_dir}/${tool_prefix}size"
 export STRINGS="${bin_dir}/${tool_prefix}strings"
 export READELF="${bin_dir}/${tool_prefix}readelf"
-
-# Sysroot variables
-export SYSROOT="$sysroot_path"
 export CROSS_COMPILE="$tool_prefix"
-
-# PKG-config setup
-export PKG_CONFIG_SYSROOT_DIR="$sysroot_path"
 export PKG_CONFIG_PATH="$sysroot_path/usr/lib/pkgconfig:$sysroot_path/usr/share/pkgconfig:$sysroot_path/lib/pkgconfig"
 export PKG_CONFIG_LIBDIR="$sysroot_path/usr/lib/pkgconfig:$sysroot_path/usr/share/pkgconfig"
-
-# Compilation flags
-export CFLAGS="--sysroot=$sysroot_path"
-export CXXFLAGS="--sysroot=$sysroot_path"
-export LDFLAGS="--sysroot=$sysroot_path"
+${sysroot_block}
 
 # Function to reset environment
 sysroot_reset() {
@@ -578,10 +650,15 @@ sysroot_reset() {
     echo "Sysroot environment reset"
 }
 
-echo "Sysroot environment loaded: $sysroot_name"
-echo "  GCC: $gcc_path"
-echo "  Target: $target_triplet"
-echo "  Use 'sysroot_reset' to restore original environment"
+    echo "Sysroot environment loaded: $sysroot_name"
+    echo "  GCC: $gcc_path"
+    echo "  Target: $target_triplet"
+    if [[ -n "\$SYSROOT" ]]; then
+        echo "  Sysroot: $sysroot_path (exported; --sysroot applied)"
+    else
+        echo "  Sysroot flags: not applied"
+    fi
+    echo "  Use 'sysroot_reset' to restore original environment"
 EOF
 }
 

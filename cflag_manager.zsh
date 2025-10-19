@@ -2,8 +2,6 @@
 
 # cflag_manager.zsh - GCC C/C++ Compiler Flag Management Tool
 # Manages C and C++ standard flags, 32-bit compilation, and environment variables
-# Author: GitHub Copilot
-# Version: 1.0.0
 
 
 CFLAGS_BACKUP_FILE="$HOME/.cflags_backup"
